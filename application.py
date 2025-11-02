@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 import json
 from functools import wraps
 from database import db, init_db, User, Resource, Transaction
+from urllib.parse import quote_plus
 import boto3
 from werkzeug.utils import secure_filename
 import uuid
@@ -17,6 +18,15 @@ load_dotenv()
 application = Flask(__name__)
 application.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
 db_url = os.getenv('DATABASE_URL')
+if not db_url:
+    db_user = os.getenv('DB_USER')
+    db_password = os.getenv('DB_PASS') or os.getenv('DB_PASSWORD')
+    db_host = os.getenv('DB_HOST')
+    db_name = os.getenv('DB_NAME')
+    db_port = os.getenv('DB_PORT', '3306')
+    if all([db_user, db_password, db_host, db_name]):
+        safe_password = quote_plus(db_password)
+        db_url = f"mysql+pymysql://{db_user}:{safe_password}@{db_host}:{db_port}/{db_name}"
 if not db_url:
     raise ValueError("DATABASE_URL environment variable is not set. Please provide a valid MySQL connection string.")
 application.config['SQLALCHEMY_DATABASE_URI'] = db_url
@@ -494,7 +504,12 @@ def update_profile():
         db.session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 500
 
+
+app = application  # Vercel entry point
+
 if __name__ == '__main__':
-    with application.app_context():
-        db.create_all()
+    # The following block is for local development and should not be run in production.
+    # In a production environment like Elastic Beanstalk, a WSGI server like Gunicorn is used.
+    # with application.app_context():
+    #     db.create_all()
     application.run(debug=True, host='0.0.0.0', port=int(os.getenv('PORT', 3000)))

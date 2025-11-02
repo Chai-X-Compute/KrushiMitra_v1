@@ -1,4 +1,4 @@
-# 🌾 Farmer Resource Pooling & Weather Information System
+# 🌾 KrushiMitra: Farmer Resource Pooling & Weather Information System
 
 A comprehensive web-based platform designed to empower farmers by providing real-time weather updates, tool/resource sharing, and multi-language support.
 
@@ -14,9 +14,9 @@ A comprehensive web-based platform designed to empower farmers by providing real
 
 - **Backend**: Python, Flask, SQLAlchemy
 - **Frontend**: HTML, CSS, JavaScript, Tailwind CSS
-- **Database**: AWS RDS (MySQL/PostgreSQL) or SQLite for local development.
+- **Database**: AWS RDS (MySQL)
 - **Authentication**: Firebase Authentication
-- **File Storage**: AWS S3 or local storage for development.
+- **File Storage**: AWS S3
 - **APIs**: OpenWeatherMap API
 
 ## 📋 Prerequisites
@@ -25,7 +25,7 @@ A comprehensive web-based platform designed to empower farmers by providing real
 - `pip` (Python package manager)
 - A Firebase project.
 - An OpenWeatherMap API key.
-- An AWS account with an S3 bucket (Optional, for image storage).
+- An AWS account with an S3 bucket.
 
 ## 🚀 Installation & Setup
 
@@ -94,10 +94,6 @@ For production environments, it is recommended to use AWS services for the datab
 
 To connect to a production database like AWS RDS (MySQL or PostgreSQL), set the `DATABASE_URL` in your `.env` file. If this is not set, the application will default to a local SQLite database.
 
-**Example for PostgreSQL:**
-```
-DATABASE_URL="postgresql://USER:PASSWORD@HOST:PORT/DATABASE"
-```
 
 **Example for MySQL:**
 ```

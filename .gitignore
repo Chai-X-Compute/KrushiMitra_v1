@@ -39,3 +39,8 @@ Thumbs.db
 # Uploads
 uploads/*
 !uploads/.gitkeep
+
+# Elastic Beanstalk Files
+.elasticbeanstalk/*
+!.elasticbeanstalk/*.cfg.yml
+!.elasticbeanstalk/*.global.yml
