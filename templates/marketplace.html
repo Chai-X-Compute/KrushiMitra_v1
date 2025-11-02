@@ -3,43 +3,6 @@
 {% block title %}Marketplace - KrushiMitra{% endblock %}
 
 {% block content %}
-<!-- Navigation -->
-<nav class="bg-green-600 shadow-lg">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="flex justify-between h-16">
-            <div class="flex items-center">
-                <i class="fas fa-tractor text-white text-2xl mr-3"></i>
-                <span class="text-white text-xl font-bold">KrushiMitra</span>
-            </div>
-            <div class="flex items-center space-x-4">
-                <a href="/dashboard" class="text-white hover:text-green-200">
-                    <i class="fas fa-home mr-1"></i> Dashboard
-                </a>
-                <a href="/marketplace" class="text-white hover:text-green-200">
-                    <i class="fas fa-store mr-1"></i> Marketplace
-                </a>
-                <a href="/add-resource" class="text-white hover:text-green-200">
-                    <i class="fas fa-plus-circle mr-1"></i> Add Resource
-                </a>
-                <a href="/my-resources" class="text-white hover:text-green-200">
-                    <i class="fas fa-box mr-1"></i> My Resources
-                </a>
-                <a href="/profile" class="text-white hover:text-green-200">
-                    <i class="fas fa-user mr-1"></i> Profile
-                </a>
-                <div class="language-selector">
-                    <i class="fas fa-globe"></i>
-                    <div id="google_translate_element"></div>
-                </div>
-                <button onclick="logout()" class="text-white hover:text-green-200">
-                    <i class="fas fa-sign-out-alt mr-1"></i> Logout
-                </button>
-            </div>
-        </div>
-    </div>
-</nav>
-
-<!-- Main Content -->
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     <!-- Header -->
     <div class="bg-white rounded-lg shadow-md p-6 mb-8">
@@ -48,55 +11,57 @@
         </h1>
         
         <!-- Search and Filters -->
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div class="md:col-span-2">
+        <div class="space-y-4">
+            <div class="w-full">
                 <input type="text" id="searchInput" placeholder="Search resources..." 
-                       class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
+                       class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-base">
             </div>
             
-            <div>
-                <select id="categoryFilter" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
-                    <option value="all">All Categories</option>
-                    <option value="farming_tools">🚜 Farming Tools</option>
-                    <option value="livestock">🐄 Livestock</option>
-                    <option value="electronics">⚡ Electronics</option>
-                    <option value="fertilizers">🌱 Fertilizers</option>
-                    <option value="pesticides">🐛 Pesticides</option>
-                    <option value="seeds">🌾 Seeds</option>
-                    <option value="irrigation">💧 Irrigation</option>
-                    <option value="other">📦 Other</option>
-                </select>
-            </div>
-            
-            <div>
-                <select id="sortFilter" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
-                    <option value="newest">Newest First</option>
-                    <option value="price_low">Price: Low to High</option>
-                    <option value="price_high">Price: High to Low</option>
-                    <option value="rating">Highest Rated</option>
-                </select>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <select id="categoryFilter" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-base bg-white">
+                        <option value="all">All Categories</option>
+                        <option value="farming_tools">🚜 Farming Tools</option>
+                        <option value="livestock">🐄 Livestock</option>
+                        <option value="electronics">⚡ Electronics</option>
+                        <option value="fertilizers">🌱 Fertilizers</option>
+                        <option value="pesticides">🐛 Pesticides</option>
+                        <option value="seeds">🌾 Seeds</option>
+                        <option value="irrigation">💧 Irrigation</option>
+                        <option value="other">📦 Other</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <select id="sortFilter" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-base bg-white">
+                        <option value="newest">Newest First</option>
+                        <option value="price_low">Price: Low to High</option>
+                        <option value="price_high">Price: High to Low</option>
+                        <option value="rating">Highest Rated</option>
+                    </select>
+                </div>
             </div>
         </div>
         
         <!-- Listing Type Filter -->
-        <div class="flex gap-2 mt-4">
-            <button onclick="filterByType('all')" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition" id="btn-all">
+        <div class="flex flex-wrap gap-2 mt-4">
+            <button onclick="filterByType('all')" class="flex-1 min-w-[80px] px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-sm sm:text-base" id="btn-all">
                 All
             </button>
-            <button onclick="filterByType('rent')" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition" id="btn-rent">
+            <button onclick="filterByType('rent')" class="flex-1 min-w-[80px] px-4 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition text-sm sm:text-base" id="btn-rent">
                 For Rent
             </button>
-            <button onclick="filterByType('borrow')" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition" id="btn-borrow">
+            <button onclick="filterByType('borrow')" class="flex-1 min-w-[80px] px-4 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition text-sm sm:text-base" id="btn-borrow">
                 For Borrow
             </button>
-            <button onclick="filterByType('sell')" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition" id="btn-sell">
+            <button onclick="filterByType('sell')" class="flex-1 min-w-[80px] px-4 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition text-sm sm:text-base" id="btn-sell">
                 For Sale
             </button>
         </div>
     </div>
 
     <!-- Resources Grid -->
-    <div id="resourcesGrid" class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
+    <div id="resourcesGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
         <!-- Resources will be populated here -->
     </div>
     
@@ -114,8 +79,8 @@
 </div>
 
 <!-- Resource Detail Modal -->
-<div id="resourceModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-    <div class="bg-white rounded-lg max-w-2xl w-full mx-4 max-h-screen overflow-y-auto">
+<div id="resourceModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-lg max-w-2xl w-full mx-auto max-h-[90vh] overflow-y-auto">
         <div class="p-6">
             <div class="flex justify-between items-start mb-4">
                 <h2 id="modalTitle" class="text-2xl font-bold text-gray-900"></h2>
@@ -131,14 +96,32 @@
 
 {% block extra_js %}
 <script>
+    // Mobile menu functionality
+    function toggleMobileMenu() {
+        const mobileMenu = document.getElementById('mobileMenu');
+        mobileMenu.classList.toggle('hidden');
+    }
+
+    // Close mobile menu when clicking outside
+    document.addEventListener('click', (e) => {
+        const mobileMenu = document.getElementById('mobileMenu');
+        const mobileMenuButton = document.querySelector('button[onclick="toggleMobileMenu()"]');
+        
+        if (!mobileMenu.contains(e.target) && !mobileMenuButton.contains(e.target) && !mobileMenu.classList.contains('hidden')) {
+            mobileMenu.classList.add('hidden');
+        }
+    });
     let allResources = [];
     let currentFilter = 'all';
+    // Logged-in flag from server
+    const isLoggedIn = {{ 'true' if user else 'false' }};
 
     async function logout() {
         try {
             await auth.signOut();
             await fetch('/api/auth/logout', { method: 'POST' });
-            window.location.href = '/login';
+            // Redirect to marketplace after logout (users can continue browsing)
+            window.location.href = '/marketplace';
         } catch (error) {
             console.error('Logout error:', error);
         }
@@ -265,54 +248,90 @@
         
         modalTitle.textContent = resource.name;
         modalContent.innerHTML = `
-            <img src="${resource.image_url || '/static/images/placeholder.svg'}" alt="${resource.name}" class="w-full h-64 object-cover rounded-lg mb-4" onerror="this.onerror=null; this.src='/static/images/placeholder.svg';">
-            
-            <div class="grid grid-cols-2 gap-4 mb-4">
-                <div>
-                    <p class="text-sm text-gray-600">Category</p>
-                    <p class="font-semibold">${resource.category}</p>
-                </div>
-                <div>
-                    <p class="text-sm text-gray-600">Listing Type</p>
-                    <p class="font-semibold capitalize">${resource.listing_type}</p>
-                </div>
-                <div>
-                    <p class="text-sm text-gray-600">Price</p>
-                    <p class="font-semibold text-green-600 text-xl">₹${resource.price}</p>
-                </div>
-                <div>
-                    <p class="text-sm text-gray-600">Condition</p>
-                    <p class="font-semibold capitalize">${resource.condition}</p>
-                </div>
-                <div>
-                    <p class="text-sm text-gray-600">Age</p>
-                    <p class="font-semibold">${resource.age_years} years</p>
-                </div>
-                <div>
-                    <p class="text-sm text-gray-600">Quality</p>
-                    <p class="font-semibold">${resource.quality}/10</p>
-                </div>
+            <!-- Image -->
+            <div class="mb-6">
+                <img src="${resource.image_url || '/static/images/placeholder.svg'}" alt="${resource.name}" class="w-full h-64 object-cover rounded-lg shadow-md" onerror="this.onerror=null; this.src='/static/images/placeholder.svg';">
             </div>
-            
-            <div class="mb-4">
-                <p class="text-sm text-gray-600 mb-2">Description</p>
-                <p class="text-gray-800">${resource.description}</p>
+
+            <!-- Details Grid -->
+            <div class="grid grid-cols-2 gap-4 mb-6 bg-gray-50 p-4 rounded-lg">
+                <div class="space-y-1">
+                    <p class="text-xs text-gray-500 uppercase tracking-wide">Category</p>
+                    <p class="font-semibold text-gray-900 capitalize">${resource.category?.replace(/_/g,' ') || 'N/A'}</p>
+                </div>
+                <div class="space-y-1">
+                    <p class="text-xs text-gray-500 uppercase tracking-wide">Listing Type</p>
+                    <p class="font-semibold text-gray-900 capitalize">${resource.listing_type || 'N/A'}</p>
+                </div>
+                <div class="space-y-1">
+                    <p class="text-xs text-gray-500 uppercase tracking-wide">Price</p>
+                    <p class="font-bold text-green-600 text-xl">₹${resource.price}</p>
+                </div>
+                <div class="space-y-1">
+                    <p class="text-xs text-gray-500 uppercase tracking-wide">Condition</p>
+                    <p class="font-semibold text-gray-900 capitalize">${resource.condition || 'N/A'}</p>
+                </div>
+                ${resource.age_years ? `
+                <div class="space-y-1">
+                    <p class="text-xs text-gray-500 uppercase tracking-wide">Age</p>
+                    <p class="font-semibold text-gray-900">${resource.age_years} years</p>
+                </div>` : ''}
+                ${resource.quality ? `
+                <div class="space-y-1">
+                    <p class="text-xs text-gray-500 uppercase tracking-wide">Quality</p>
+                    <p class="font-semibold text-gray-900">${resource.quality}/10</p>
+                </div>` : ''}
             </div>
-            
-            <div class="bg-gray-50 rounded-lg p-4 mb-4">
-                <h3 class="font-bold mb-2">Owner Information</h3>
-                <p class="text-gray-700"><i class="fas fa-user mr-2"></i> ${resource.owner.name}</p>
-                <p class="text-gray-700"><i class="fas fa-phone mr-2"></i> ${resource.owner.phone}</p>
-                <p class="text-gray-700"><i class="fas fa-map-marker-alt mr-2"></i> ${resource.owner.location}</p>
+
+            <!-- Description -->
+            <div class="mb-6">
+                <h3 class="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-2">Description</h3>
+                <p class="text-gray-800 leading-relaxed">${resource.description || ''}</p>
             </div>
-            
-            <div class="flex gap-2">
-                <a href="tel:${resource.owner.phone}" class="flex-1 bg-green-600 text-white px-4 py-3 rounded-lg hover:bg-green-700 transition text-center">
-                    <i class="fas fa-phone mr-2"></i> Call Owner
-                </a>
-                <a href="https://wa.me/${resource.owner.phone.replace(/\D/g, '')}" target="_blank" class="flex-1 bg-blue-600 text-white px-4 py-3 rounded-lg hover:bg-blue-700 transition text-center">
-                    <i class="fab fa-whatsapp mr-2"></i> WhatsApp
-                </a>
+
+            <!-- Owner Information -->
+            <div class="border-t pt-6 mb-6">
+                <h3 class="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-3">
+                    <i class="fas fa-user-circle mr-2 text-green-600"></i>Owner Information
+                </h3>
+
+                ${isLoggedIn ? `
+                <div class="bg-gradient-to-br from-green-50 to-blue-50 rounded-lg p-4 space-y-3 border border-green-100">
+                    <div class="flex items-center"><i class="fas fa-user mr-3 w-5 text-green-600"></i><span class="font-semibold text-gray-900">${resource.owner?.name || 'Owner'}</span></div>
+                    ${resource.owner?.email ? `<div class=\"flex items-center\"><i class=\"fas fa-envelope mr-3 w-5 text-green-600\"></i><a class=\"text-blue-600 hover:underline break-all\" href=\"mailto:${resource.owner.email}\">${resource.owner.email}</a></div>` : ''}
+                    ${resource.owner?.phone ? `<div class=\"flex items-center\"><i class=\"fas fa-phone mr-3 w-5 text-green-600\"></i><a class=\"text-blue-600 hover:underline font-medium\" href=\"tel:${resource.owner.phone}\">${resource.owner.phone}</a></div>` : ''}
+                    ${resource.owner?.location ? `<div class=\"flex items-center\"><i class=\"fas fa-map-marker-alt mr-3 w-5 text-green-600\"></i><span class=\"text-gray-700\">${resource.owner.location}</span></div>` : ''}
+                </div>
+                ` : `
+                <div class="relative">
+                    <div class="bg-gray-100 rounded-lg p-4 space-y-3 blur-sm select-none pointer-events-none">
+                        <div class="flex items-center"><i class="fas fa-user mr-3 w-5 text-gray-400"></i><span class="font-semibold text-gray-600">John Doe</span></div>
+                        <div class="flex items-center"><i class="fas fa-envelope mr-3 w-5 text-gray-400"></i><span class="text-gray-600">owner@example.com</span></div>
+                        <div class="flex items-center"><i class="fas fa-phone mr-3 w-5 text-gray-400"></i><span class="text-gray-600">+91 9876543210</span></div>
+                        <div class="flex items-center"><i class="fas fa-map-marker-alt mr-3 w-5 text-gray-400"></i><span class="text-gray-600">Location</span></div>
+                    </div>
+                    <div class="absolute inset-0 flex items-center justify-center bg-white bg-opacity-90 rounded-lg">
+                        <div class="text-center p-4">
+                            <i class="fas fa-lock text-blue-600 text-3xl mb-2"></i>
+                            <p class="font-semibold text-gray-900 mb-1">Login to View Contact</p>
+                            <p class="text-sm text-gray-600">Sign in to see owner details</p>
+                        </div>
+                    </div>
+                </div>
+                `}
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                ${isLoggedIn && resource.owner?.phone ? `
+                <a href="tel:${resource.owner.phone}" class="bg-green-600 text-white px-4 py-3 rounded-lg hover:bg-green-700 transition text-center flex items-center justify-center font-medium shadow-md"><i class="fas fa-phone mr-2"></i> Call</a>
+                <a href="https://wa.me/${(resource.owner.phone||'').replace(/\D/g,'')}" target="_blank" class="bg-green-500 text-white px-4 py-3 rounded-lg hover:bg-green-600 transition text-center flex items-center justify-center font-medium shadow-md"><i class="fab fa-whatsapp mr-2 text-lg"></i> WhatsApp</a>
+                <button onclick="closeModal()" class="bg-gray-200 text-gray-800 px-4 py-3 rounded-lg hover:bg-gray-300 transition font-medium shadow-md"><i class="fas fa-times mr-2"></i> Close</button>
+                ` : `
+                <a href="/login" class="bg-green-600 text-white px-4 py-3 rounded-lg hover:bg-green-700 transition text-center flex items-center justify-center font-medium shadow-md"><i class="fas fa-sign-in-alt mr-2"></i> Login</a>
+                <a href="/signup" class="bg-blue-600 text-white px-4 py-3 rounded-lg hover:bg-blue-700 transition text-center flex items-center justify-center font-medium shadow-md"><i class="fas fa-user-plus mr-2"></i> Sign Up</a>
+                <button onclick="closeModal()" class="bg-gray-200 text-gray-800 px-4 py-3 rounded-lg hover:bg-gray-300 transition font-medium shadow-md"><i class="fas fa-times mr-2"></i> Close</button>
+                `}
             </div>
         `;
         

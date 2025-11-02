@@ -75,9 +75,8 @@ os.makedirs(application.config['UPLOAD_FOLDER'], exist_ok=True)
 
 @application.route('/')
 def index():
-    if 'user_id' in session:
-        return redirect(url_for('dashboard'))
-    return redirect(url_for('login'))
+    # Allow browsing without login, redirect to marketplace
+    return redirect(url_for('marketplace'))
 
 @application.route('/login')
 def login():
@@ -88,15 +87,18 @@ def signup():
     return render_template('signup.html')
 
 @application.route('/dashboard')
-@login_required
 def dashboard():
-    user = User.query.get(session['user_id'])
+    user = None
+    if 'user_id' in session:
+        user = User.query.get(session['user_id'])
     return render_template('dashboard.html', user=user)
 
 @application.route('/marketplace')
-@login_required
 def marketplace():
-    return render_template('marketplace.html')
+    user = None
+    if 'user_id' in session:
+        user = User.query.get(session['user_id'])
+    return render_template('marketplace.html', user=user)
 
 @application.route('/add-resource')
 @login_required
@@ -408,6 +410,44 @@ def create_resource():
         db.session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 500
 
+@application.route('/api/resources/<int:resource_id>', methods=['GET'])
+def get_resource_detail(resource_id):
+    try:
+        resource = Resource.query.get(resource_id)
+        
+        if not resource:
+            return jsonify({'success': False, 'message': 'Resource not found'}), 404
+        
+        # Get owner information
+        owner = User.query.get(resource.owner_id)
+        
+        resource_data = {
+            'id': resource.id,
+            'name': resource.name,
+            'description': resource.description,
+            'category': resource.category,
+            'listing_type': resource.listing_type,
+            'price': float(resource.price),
+            'condition': resource.condition,
+            'age': resource.age,
+            'quality': resource.quality,
+            'location': resource.location,
+            'image_url': resource.image_url,
+            'is_available': resource.is_available,
+            'created_at': resource.created_at.isoformat() if resource.created_at else None,
+            'owner': {
+                'name': owner.name if owner else 'Owner',
+                'email': owner.email if owner else '',
+                'phone': owner.phone if owner else '',
+                'location': owner.location if owner else ''
+            }
+        }
+        
+        return jsonify({'success': True, 'data': resource_data})
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
 @application.route('/api/resources/<int:resource_id>', methods=['PUT'])
 @login_required
 def update_resource(resource_id):
@@ -508,8 +548,9 @@ def update_profile():
 app = application  # Vercel entry point
 
 if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000, debug=True)
     # The following block is for local development and should not be run in production.
     # In a production environment like Elastic Beanstalk, a WSGI server like Gunicorn is used.
     # with application.app_context():
     #     db.create_all()
-    application.run(debug=True, host='0.0.0.0', port=int(os.getenv('PORT', 3000)))
+    # application.run(debug=True, host='0.0.0.0', port=int(os.getenv('PORT', 3000)))
