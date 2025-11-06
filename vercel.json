@@ -5,7 +5,14 @@
     { "src": "application.py", "use": "@vercel/python" }
   ],
   "routes": [
+    { "handle": "filesystem" },
     { "src": "/static/(.*)", "dest": "/static/$1" },
-    { "src": "/(.*)", "dest": "application.py" }
-  ]
+    { "src": "/(.*)", "dest": "/application.py" }
+  ],
+  "functions": {
+    "application.py": {
+      "memory": 1024,
+      "maxDuration": 10
+    }
+  }
 }
