@@ -135,14 +135,17 @@
                 displayName: name
             });
             
+            // Get ID token
+            const idToken = await user.getIdToken();
+            
             // Send to backend
             const response = await fetch('/api/auth/register', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${idToken}`
                 },
                 body: JSON.stringify({
-                    firebase_uid: user.uid,
                     email: email,
                     name: name,
                     phone: phone,

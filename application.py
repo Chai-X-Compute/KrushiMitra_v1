@@ -5,6 +5,7 @@ import os
 import requests
 from datetime import datetime, timedelta
 import json
+import time
 from functools import wraps
 from database import db, init_db, User, Resource, Transaction
 from urllib.parse import quote_plus
@@ -40,9 +41,21 @@ except ValueError:
             raise
 
 application = Flask(__name__)
-# Use environment SECRET_KEY in production; fall back to a dev key to avoid crashes
-# when running locally. Replace via env when deploying.
-application.config['SECRET_KEY'] = os.getenv('SECRET_KEY') or 'dev-secret-change-me'
+
+# Security configuration
+if os.environ.get('VERCEL') or os.environ.get('PRODUCTION'):
+    if not os.getenv('SECRET_KEY'):
+        raise ValueError("SECRET_KEY must be set in production")
+    application.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
+    application.config['SESSION_COOKIE_SECURE'] = True
+    application.config['SESSION_COOKIE_HTTPONLY'] = True
+    application.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+    application.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=1)
+    application.config['SESSION_COOKIE_NAME'] = '__Host-session'  # Secure naming
+else:
+    # Development settings
+    application.config['SECRET_KEY'] = os.getenv('SECRET_KEY') or 'dev-secret-change-me'
+    print("⚠️ Using development secret key. Do not use in production!")
 db_url = os.getenv('DATABASE_URL')
 if not db_url:
     db_user = os.getenv('DB_USER')
@@ -52,7 +65,16 @@ if not db_url:
     db_port = os.getenv('DB_PORT', '3306')
     if all([db_user, db_password, db_host, db_name]):
         safe_password = quote_plus(db_password)
-        db_url = f"mysql+pymysql://{db_user}:{safe_password}@{db_host}:{db_port}/{db_name}"
+        # Add connection pooling and retry parameters
+        params = {
+            'pool_size': int(os.getenv('DB_POOL_SIZE', '10')),
+            'max_overflow': int(os.getenv('DB_MAX_OVERFLOW', '20')),
+            'pool_timeout': int(os.getenv('DB_POOL_TIMEOUT', '30')),
+            'pool_recycle': int(os.getenv('DB_POOL_RECYCLE', '1800')),  # 30 minutes
+            'pool_pre_ping': True  # Enable connection health checks
+        }
+        param_str = '&'.join(f'{k}={v}' for k, v in params.items())
+        db_url = f"mysql+pymysql://{db_user}:{safe_password}@{db_host}:{db_port}/{db_name}?{param_str}"
 if not db_url:
     raise ValueError("DATABASE_URL environment variable is not set. Please provide a valid MySQL connection string.")
 application.config['SQLALCHEMY_DATABASE_URI'] = db_url
@@ -60,7 +82,17 @@ application.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 application.config['UPLOAD_FOLDER'] = 'static/uploads'
 application.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 
-CORS(application)
+# Configure CORS
+if os.environ.get('VERCEL') or os.environ.get('PRODUCTION'):
+    # Production CORS settings
+    allowed_origins = os.getenv('ALLOWED_ORIGINS', '').split(',')
+    CORS(application, 
+         resources={r"/api/*": {"origins": allowed_origins}},
+         supports_credentials=True)
+else:
+    # Development CORS settings
+    CORS(application)
+    print("⚠️ Using development CORS settings. Configure ALLOWED_ORIGINS in production!")
 
 # Initialize database
 init_db(application)
@@ -102,7 +134,9 @@ def login_required(f):
             # Check for Firebase token in Authorization header
             auth_header = request.headers.get('Authorization')
             if not auth_header or not auth_header.startswith('Bearer '):
-                return jsonify({'success': False, 'message': 'No authentication token'}), 401
+                if request.is_json or request.path.startswith('/api/'):
+                    return jsonify({'success': False, 'message': 'Authentication required'}), 401
+                return redirect(url_for('login', next=request.url))
             
             try:
                 # Verify the token with Firebase
@@ -113,12 +147,16 @@ def login_required(f):
                 # Find user by Firebase UID
                 user = User.query.filter_by(firebase_uid=firebase_uid).first()
                 if not user:
-                    return jsonify({'success': False, 'message': 'User not found'}), 404
+                    if request.is_json or request.path.startswith('/api/'):
+                        return jsonify({'success': False, 'message': 'User not found'}), 404
+                    return redirect(url_for('login', next=request.url))
                 
                 # Set session
                 session['user_id'] = user.id
             except Exception as e:
-                return jsonify({'success': False, 'message': 'Invalid authentication token'}), 401
+                if request.is_json or request.path.startswith('/api/'):
+                    return jsonify({'success': False, 'message': 'Invalid authentication token'}), 401
+                return redirect(url_for('login', next=request.url))
         
         return f(*args, **kwargs)
     return decorated_function
@@ -133,7 +171,11 @@ def index():
 
 @application.route('/login')
 def login():
-    return render_template('login.html')
+    next_url = request.args.get('next', url_for('dashboard'))
+    # If user is already logged in, redirect to next_url
+    if 'user_id' in session:
+        return redirect(next_url)
+    return render_template('login.html', next_url=next_url)
 
 @application.route('/signup')
 def signup():
@@ -178,15 +220,20 @@ def register():
     try:
         data = request.json
         
-        # Verify Firebase ID token
-        id_token = data.get('id_token')
-        if not id_token:
-            return jsonify({'success': False, 'message': 'No ID token provided'}), 401
-            
+        # Get the ID token from Authorization header
+        auth_header = request.headers.get('Authorization', '')
+        if not auth_header.startswith('Bearer '):
+            return jsonify({'success': False, 'message': 'No Bearer token provided'}), 401
+        
+        id_token = auth_header.split('Bearer ')[1]
         try:
-            # Verify the token with Firebase
-            decoded_token = auth.verify_id_token(id_token)
-            firebase_uid = decoded_token['uid']
+            # For testing: if we're in development and it looks like a custom token
+            if os.getenv('FLASK_ENV') == 'development':
+                firebase_uid = id_token  # Use token directly as UID in dev mode
+            else:
+                # In production, always verify tokens
+                decoded_token = auth.verify_id_token(id_token)
+                firebase_uid = decoded_token['uid']
         except Exception as e:
             return jsonify({'success': False, 'message': 'Invalid ID token'}), 401
         
@@ -240,29 +287,66 @@ def register():
 def api_login():
     try:
         data = request.json
+        if not data:
+            return jsonify({
+                'success': False,
+                'message': 'Missing request body',
+                'error': 'MISSING_DATA'
+            }), 400
+
+        # Get the ID token from Authorization header
+        auth_header = request.headers.get('Authorization', '')
+        if not auth_header.startswith('Bearer '):
+            return jsonify({
+                'success': False,
+                'message': 'No Bearer token provided',
+                'error': 'MISSING_TOKEN'
+            }), 401
         
-        # Verify Firebase ID token
-        id_token = data.get('id_token')
-        if not id_token:
-            return jsonify({'success': False, 'message': 'No ID token provided'}), 401
-            
+        id_token = auth_header.split('Bearer ')[1]
         try:
-            # Verify the token with Firebase
-            decoded_token = auth.verify_id_token(id_token)
-            firebase_uid = decoded_token['uid']
+            # For testing: if we're in development and it looks like a custom token
+            if os.getenv('FLASK_ENV') == 'development':
+                firebase_uid = id_token  # Use token directly as UID in dev mode
+                app.logger.debug('Development mode: Using token as UID')
+            else:
+                # In production, always verify tokens
+                decoded_token = auth.verify_id_token(id_token)
+                firebase_uid = decoded_token['uid']
+                app.logger.debug(f'Production mode: Verified token for UID {firebase_uid}')
         except Exception as e:
-            return jsonify({'success': False, 'message': 'Invalid ID token'}), 401
+            app.logger.error(f'Token verification error: {str(e)}')
+            return jsonify({
+                'success': False,
+                'message': 'Invalid authentication token',
+                'error': 'INVALID_TOKEN'
+            }), 401
         
         # Find user by email or firebase_uid
-        user = User.query.filter((User.email == data['email']) | (User.firebase_uid == firebase_uid)).first()
+        user = User.query.filter((User.email == data.get('email')) | 
+                               (User.firebase_uid == firebase_uid)).first()
         
         if not user:
-            return jsonify({'success': False, 'message': 'User not found'}), 404
+            return jsonify({
+                'success': False,
+                'message': 'User not found. Please register first.',
+                'error': 'USER_NOT_FOUND'
+            }), 404
         
         # Update Firebase UID if needed
         if user.firebase_uid != firebase_uid:
-            user.firebase_uid = firebase_uid
-            db.session.commit()
+            try:
+                user.firebase_uid = firebase_uid
+                db.session.commit()
+                app.logger.info(f'Updated Firebase UID for user {user.id}')
+            except Exception as e:
+                app.logger.error(f'Failed to update Firebase UID: {str(e)}')
+                db.session.rollback()
+                return jsonify({
+                    'success': False,
+                    'message': 'Failed to update user data',
+                    'error': 'DATABASE_ERROR'
+                }), 500
         
         session['user_id'] = user.id
         
@@ -273,16 +357,51 @@ def api_login():
                 'id': user.id,
                 'name': user.name,
                 'email': user.email,
-                'location': user.location
+                'location': user.location,
+                'phone': user.phone,
+                'language_preference': user.language_preference,
+                'firebase_uid': user.firebase_uid
             }
         })
     except Exception as e:
-        return jsonify({'success': False, 'message': str(e)}), 500
+        app.logger.error(f'Login error: {str(e)}')
+        return jsonify({
+            'success': False,
+            'message': 'An error occurred during login',
+            'error': 'SERVER_ERROR'
+        }), 500
 
 @application.route('/api/auth/logout', methods=['POST'])
 def logout():
     session.pop('user_id', None)
     return jsonify({'success': True, 'message': 'Logged out successfully'})
+
+@application.route('/api/config/firebase')
+def firebase_config():
+    try:
+        config = {
+            'apiKey': os.getenv('FIREBASE_API_KEY'),
+            'authDomain': os.getenv('FIREBASE_AUTH_DOMAIN'),
+            'projectId': os.getenv('FIREBASE_PROJECT_ID'),
+            'storageBucket': os.getenv('FIREBASE_STORAGE_BUCKET'),
+            'messagingSenderId': os.getenv('FIREBASE_MESSAGING_SENDER_ID'),
+            'appId': os.getenv('FIREBASE_APP_ID')
+        }
+        # Verify all required fields are present
+        if not all(config.values()):
+            missing = [k for k, v in config.items() if not v]
+            app.logger.error(f'Missing Firebase config values: {missing}')
+            return jsonify({
+                'success': False,
+                'message': 'Firebase configuration is incomplete'
+            }), 500
+        return jsonify({'success': True, 'config': config})
+    except Exception as e:
+        app.logger.error(f'Error getting Firebase config: {str(e)}')
+        return jsonify({
+            'success': False,
+            'message': 'Failed to load Firebase configuration'
+        }), 500
 
 @application.route('/api/weather', methods=['GET'])
 def get_weather():
@@ -462,19 +581,69 @@ def create_resource():
                 
                 if s3_client:
                     try:
-                        # Upload directly to S3 from memory (no local file needed)
-                        s3_client.upload_fileobj(
-                            file,
-                            os.getenv('S3_BUCKET'),
-                            unique_filename,
-                            ExtraArgs={'ContentType': file.content_type}
-                        )
-                        s3_url = f"https://{os.getenv('S3_BUCKET')}.s3.{os.getenv('AWS_REGION')}.amazonaws.com/{unique_filename}"
-                        image_url = s3_url
-                        print(f"✅ Image uploaded to S3: {s3_url}")
+                        # Validate file size before upload
+                        file.seek(0, os.SEEK_END)
+                        size = file.tell()
+                        file.seek(0)
+                        
+                        if size > application.config['MAX_CONTENT_LENGTH']:
+                            return jsonify({
+                                'success': False,
+                                'message': f'File too large. Maximum size is {application.config["MAX_CONTENT_LENGTH"] / (1024 * 1024)}MB'
+                            }), 413
+
+                        # Validate content type
+                        content_type = file.content_type
+                        if not content_type.startswith('image/'):
+                            return jsonify({
+                                'success': False,
+                                'message': 'Invalid file type. Only images are allowed.'
+                            }), 415
+
+                        # Ensure the bucket exists
+                        bucket = os.getenv('S3_BUCKET')
+                        try:
+                            s3_client.head_bucket(Bucket=bucket)
+                        except:
+                            app.logger.error(f"S3 bucket {bucket} not found or not accessible")
+                            return jsonify({
+                                'success': False,
+                                'message': 'Storage configuration error'
+                            }), 500
+
+                        # Upload with retry
+                        max_retries = 3
+                        for attempt in range(max_retries):
+                            try:
+                                s3_client.upload_fileobj(
+                                    file,
+                                    bucket,
+                                    unique_filename,
+                                    ExtraArgs={
+                                        'ContentType': content_type,
+                                        'CacheControl': 'max-age=31536000'  # 1 year cache
+                                    }
+                                )
+                                s3_url = f"https://{bucket}.s3.{os.getenv('AWS_REGION')}.amazonaws.com/{unique_filename}"
+                                image_url = s3_url
+                                app.logger.info(f"✅ Image uploaded to S3: {s3_url}")
+                                break
+                            except Exception as e:
+                                if attempt == max_retries - 1:
+                                    app.logger.error(f"❌ S3 upload failed after {max_retries} attempts: {str(e)}")
+                                    return jsonify({
+                                        'success': False,
+                                        'message': 'Failed to upload image'
+                                    }), 500
+                                app.logger.warning(f"⚠️ S3 upload attempt {attempt + 1} failed: {str(e)}")
+                                time.sleep(1)  # Wait before retry
+                                
                     except Exception as e:
-                        print(f"❌ S3 upload failed: {e}")
-                        return jsonify({'success': False, 'message': 'Failed to upload image'}), 500
+                        app.logger.error(f"❌ S3 upload error: {str(e)}")
+                        return jsonify({
+                            'success': False,
+                            'message': 'Failed to process image upload'
+                        }), 500
                 
                 # Only try local storage if we're not on Vercel and S3 upload failed
                 elif not is_vercel:

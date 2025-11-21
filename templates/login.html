@@ -23,18 +23,19 @@
         </div>
         
         <form class="mt-8 space-y-6" id="loginForm">
+            <input type="hidden" id="nextUrl" value="{{ next_url or url_for('dashboard') }}">
             <div class="rounded-md shadow-sm -space-y-px">
                 <div>
                     <label for="email" class="sr-only">Email address</label>
                     <input id="email" name="email" type="email" required 
                            class="appearance-none rounded-t-md relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-green-500 focus:border-green-500 focus:z-10 sm:text-sm" 
-                           placeholder="Email address">
+                           placeholder="Email address" autocomplete="email">
                 </div>
                 <div>
                     <label for="password" class="sr-only">Password</label>
                     <input id="password" name="password" type="password" required 
                            class="appearance-none rounded-b-md relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-green-500 focus:border-green-500 focus:z-10 sm:text-sm" 
-                           placeholder="Password">
+                           placeholder="Password" autocomplete="current-password">
                 </div>
             </div>
 
@@ -62,42 +63,106 @@
 
 {% block extra_js %}
 <script>
-    document.getElementById('loginForm').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        
-        const email = document.getElementById('email').value;
-        const password = document.getElementById('password').value;
+    document.addEventListener('DOMContentLoaded', function() {
+        const loginForm = document.getElementById('loginForm');
         const errorMessage = document.getElementById('errorMessage');
         
-        try {
-            // Sign in with Firebase
-            const userCredential = await auth.signInWithEmailAndPassword(email, password);
-            const user = userCredential.user;
-            
-            // Send to backend
-            const response = await fetch('/api/auth/login', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    email: email,
-                    firebase_uid: user.uid
-                })
-            });
-            
-            const data = await response.json();
-            
-            if (data.success) {
-                window.location.href = '/dashboard';
-            } else {
-                errorMessage.textContent = data.message;
+        // Initialize Firebase
+        let firebaseApp;
+        let auth;
+        
+        // Load Firebase config and initialize
+        fetch('/api/config/firebase')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    firebaseApp = firebase.initializeApp(data.config);
+                    auth = firebaseApp.auth();
+                    setupLoginForm();
+                } else {
+                    console.error('Failed to load Firebase config:', data.message);
+                    errorMessage.textContent = 'Failed to initialize authentication. Please try again later.';
+                    errorMessage.classList.remove('hidden');
+                }
+            })
+            .catch(error => {
+                console.error('Error loading Firebase config:', error);
+                errorMessage.textContent = 'Failed to load authentication service. Please check your connection.';
                 errorMessage.classList.remove('hidden');
-            }
-        } catch (error) {
-            errorMessage.textContent = error.message;
-            errorMessage.classList.remove('hidden');
+            });
+        
+        function setupLoginForm() {
+            loginForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                
+                const email = document.getElementById('email').value;
+                const password = document.getElementById('password').value;
+                const nextUrl = document.getElementById('nextUrl').value;
+                
+                // Show loading state
+                const submitBtn = loginForm.querySelector('button[type="submit"]');
+                const originalBtnText = submitBtn.innerHTML;
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = `
+                    <i class="fas fa-spinner fa-spin mr-2"></i>
+                    <span>Signing in...</span>
+                `;
+                
+                try {
+                    // Sign in with Firebase
+                    const userCredential = await auth.signInWithEmailAndPassword(email, password);
+                    const user = userCredential.user;
+                    
+                    // Get ID token
+                    const idToken = await user.getIdToken();
+                    
+                    // Send to backend
+                    const response = await fetch('/api/auth/login', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${idToken}`
+                        },
+                        body: JSON.stringify({ email })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        // Redirect to the intended URL or dashboard
+                        window.location.href = nextUrl;
+                    } else {
+                        throw new Error(data.message || 'Login failed. Please try again.');
+                    }
+                } catch (error) {
+                    console.error('Login error:', error);
+                    errorMessage.textContent = error.message || 'An error occurred during login. Please try again.';
+                    errorMessage.classList.remove('hidden');
+                    
+                    // Reset form state
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = originalBtnText;
+                }
+            });
         }
+        
+        // Handle password visibility toggle
+        const passwordInput = document.getElementById('password');
+        const togglePassword = document.createElement('button');
+        togglePassword.type = 'button';
+        togglePassword.className = 'absolute inset-y-0 right-0 pr-3 flex items-center';
+        togglePassword.innerHTML = '<i class="far fa-eye text-gray-500 hover:text-gray-700"></i>';
+        togglePassword.addEventListener('click', () => {
+            const type = passwordInput.type === 'password' ? 'text' : 'password';
+            passwordInput.type = type;
+            togglePassword.innerHTML = type === 'password' 
+                ? '<i class="far fa-eye text-gray-500 hover:text-gray-700"></i>'
+                : '<i class="far fa-eye-slash text-gray-500 hover:text-gray-700"></i>';
+        });
+        
+        const passwordContainer = document.querySelector('input[type="password"]').parentNode;
+        passwordContainer.classList.add('relative');
+        passwordContainer.appendChild(togglePassword);
     });
 </script>
 {% endblock %}

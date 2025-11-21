@@ -1,27 +1,61 @@
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
+import time
+import os
 
 db = SQLAlchemy()
 
 def init_db(app):
     db.init_app(app)
+    max_retries = 5
+    retry_delay = 2  # seconds
+    
     with app.app_context():
-        # Test the database connection
+        # Test the database connection with retries
+        for attempt in range(max_retries):
+            try:
+                with db.engine.connect() as connection:
+                    # Test query to ensure connection is working
+                    connection.execute(db.text("SELECT 1"))
+                    print(f"\n✅ Database connection successful (attempt {attempt + 1}/{max_retries}).\n")
+                    break
+            except Exception as e:
+                if attempt < max_retries - 1:
+                    print(f"\n⚠️ Database connection attempt {attempt + 1}/{max_retries} failed.")
+                    print(f"   Error: {str(e)}")
+                    print(f"   Retrying in {retry_delay} seconds...")
+                    time.sleep(retry_delay)
+                    retry_delay *= 2  # Exponential backoff
+                else:
+                    print("\n" + "="*60)
+                    print("❌ AWS RDS DATABASE CONNECTION FAILED!")
+                    print(f"   Error: {str(e)}")
+                    print("   Please check the following:")
+                    print("     1. The `DATABASE_URL` in your .env file is correct.")
+                    print("     2. The RDS instance is running and accessible.")
+                    print("     3. The security groups for your RDS instance allow connections from your IP.")
+                    print("     4. The database server is not at maximum connections.")
+                    print("="*60 + "\n")
+                    if app.config.get('TESTING') or os.environ.get('VERCEL'):
+                        raise  # Re-raise in testing/production environments
+                    else:
+                        # In development, fall back to SQLite
+                        print("\n⚠️ Falling back to SQLite database for development.\n")
+                        app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///dev.db'
+                        db.init_app(app)
+                        with app.app_context():
+                            db.create_all()
+                        return
+                    
         try:
-            with db.engine.connect() as connection:
-                print("\n✅ Database connection successful.\n")
+            # Create tables with proper error handling
+            db.create_all()
+            print("✅ Database tables created/verified successfully")
         except Exception as e:
-            print("\n" + "="*60)
-            print("❌ AWS RDS DATABASE CONNECTION FAILED!")
-            print(f"   Error: {e}")
-            print("   Please check the following:")
-            print("     1. The `DATABASE_URL` in your .env file is correct.")
-            print("     2. The RDS instance is running and accessible.")
-            print("     3. The security groups for your RDS instance allow connections from your IP.")
-            print("="*60 + "\n")
-        
-        # Create tables
-        db.create_all()
+            print("❌ Failed to create/verify database tables")
+            print(f"   Error: {str(e)}")
+            if app.config.get('TESTING') or os.environ.get('VERCEL'):
+                raise  # Re-raise in testing/production environments
 
 class User(db.Model):
     __tablename__ = 'users'

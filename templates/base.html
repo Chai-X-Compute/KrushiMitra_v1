@@ -6,6 +6,85 @@
     <meta name="theme-color" content="#16a34a">
     <meta name="mobile-web-app-capable" content="yes">
     <title>{% block title %}KrushiMitra{% endblock %}</title>
+    <script>
+        // Global auth state
+        let currentUser = null;
+        let authInitialized = false;
+
+        // Initialize Firebase and check auth state
+        async function initializeAuth() {
+            try {
+                // Load Firebase config
+                const response = await fetch('/api/config/firebase');
+                const { success, config } = await response.json();
+                
+                if (!success) throw new Error('Failed to load Firebase config');
+                
+                // Initialize Firebase if not already initialized
+                if (!firebase.apps.length) {
+                    firebase.initializeApp(config);
+                }
+                
+                // Set up auth state observer
+                firebase.auth().onAuthStateChanged((user) => {
+                    if (user) {
+                        currentUser = user;
+                        updateUIForAuth(true);
+                    } else {
+                        currentUser = null;
+                        updateUIForAuth(false);
+                    }
+                    authInitialized = true;
+                });
+                
+            } catch (error) {
+                console.error('Auth initialization error:', error);
+            }
+        }
+
+        // Update UI based on auth state
+        function updateUIForAuth(isAuthenticated) {
+            const protectedLinks = document.querySelectorAll('[data-protected]');
+            protectedLinks.forEach(link => {
+                link.onclick = (e) => {
+                    if (!isAuthenticated) {
+                        e.preventDefault();
+                        const nextUrl = link.getAttribute('href');
+                        window.location.href = `/login?next=${encodeURIComponent(nextUrl)}`;
+                        return false;
+                    }
+                };
+            });
+        }
+
+        // Check authentication status
+        async function checkAuth() {
+            if (!authInitialized) {
+                await new Promise(resolve => {
+                    const checkAuth = setInterval(() => {
+                        if (authInitialized) {
+                            clearInterval(checkAuth);
+                            resolve();
+                        }
+                    }, 100);
+                });
+            }
+            return !!currentUser;
+        }
+
+        // Require authentication
+        async function requireAuth(redirectUrl = window.location.pathname) {
+            const isAuthenticated = await checkAuth();
+            if (!isAuthenticated) {
+                window.location.href = `/login?next=${encodeURIComponent(redirectUrl)}`;
+                return false;
+            }
+            return true;
+        }
+
+        // Initialize auth when the page loads
+        document.addEventListener('DOMContentLoaded', initializeAuth);
+    </script>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -228,11 +307,11 @@
                     <a href="/marketplace" class="text-white hover:bg-green-700 px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center">
                         <i class="fas fa-store mr-1"></i> <span class="hidden lg:inline">Marketplace</span>
                     </a>
-                    <a href="/add-resource" class="text-white hover:bg-green-700 px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center">
+                    <a href="/add-resource" data-protected class="text-white hover:bg-green-700 px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center">
                         <i class="fas fa-plus-circle mr-1"></i> <span class="hidden lg:inline">Add Resource</span>
                     </a>
-                    <a href="/my-resources" class="text-white hover:bg-green-700 px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center">
-                        <i class="fas fa-box mr-1"></i> <span class="hidden lg:inline">My Resources</span>
+                    <a href="/my-resources" data-protected class="text-white hover:bg-green-700 px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center">
+                        <i class="fas fa-boxes mr-1"></i> <span class="hidden lg:inline">My Resources</span>
                     </a>
                     <div class="relative group" id="accountDropdown">
                         <button class="text-white hover:bg-green-700 px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center" 
@@ -292,13 +371,11 @@
                         <span>Marketplace</span>
                     </a>
                     {% if user %}
-                    <a href="/add-resource" class="flex items-center text-white hover:bg-green-700 px-3 py-3 rounded-md text-base font-medium">
-                        <i class="fas fa-plus-circle mr-3 w-6 text-center"></i>
-                        <span>Add Resource</span>
+                    <a href="#" onclick="event.preventDefault(); checkAuth().then(ok => ok && (window.location.href='/add-resource'))" class="block px-3 py-2 text-base font-medium text-white hover:bg-green-700 rounded-md">
+                        <i class="fas fa-plus-circle mr-2"></i>Add Resource
                     </a>
-                    <a href="/my-resources" class="flex items-center text-white hover:bg-green-700 px-3 py-3 rounded-md text-base font-medium">
-                        <i class="fas fa-box mr-3 w-6 text-center"></i>
-                        <span>My Resources</span>
+                    <a href="#" onclick="event.preventDefault(); checkAuth().then(ok => ok && (window.location.href='/my-resources'))" class="block px-3 py-2 text-base font-medium text-white hover:bg-green-700 rounded-md">
+                        <i class="fas fa-boxes mr-2"></i>My Resources
                     </a>
                     <div class="border-t border-green-500 my-2"></div>
                     <a href="/profile" class="flex items-center text-white hover:bg-green-700 px-3 py-3 rounded-md text-base font-medium">
@@ -366,6 +443,26 @@
     </style>
     
     <script>
+        // Check if user is logged in
+        async function checkAuth(redirectToLogin = true) {
+            try {
+                const user = auth.currentUser;
+                if (!user) {
+                    if (redirectToLogin) {
+                        window.location.href = '/login?next=' + encodeURIComponent(window.location.pathname);
+                    }
+                    return false;
+                }
+                return true;
+            } catch (error) {
+                console.error('Auth check failed:', error);
+                if (redirectToLogin) {
+                    window.location.href = '/login?next=' + encodeURIComponent(window.location.pathname);
+                }
+                return false;
+            }
+        }
+
         // Account Dropdown Toggle
         let dropdownOpen = false;
         
@@ -494,17 +591,19 @@
     
     <!-- Firebase Configuration -->
     <script>
-        const firebaseConfig = {
-            apiKey: "AIzaSyCPqghw0GaqiIEiDcE9mtjG_lMbpaZqVrs",
-            authDomain: "farmerresourcepool.firebaseapp.com",
-            projectId: "farmerresourcepool",
-            storageBucket: "farmerresourcepool.firebasestorage.app",
-            messagingSenderId: "632882075807",
-            appId: "1:632882075807:web:a566d4b85625556b8baaaa"
-        };
-        
-        firebase.initializeApp(firebaseConfig);
-        const auth = firebase.auth();
+        fetch('/api/config/firebase')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    firebase.initializeApp(data.config);
+                    window.auth = firebase.auth();
+                } else {
+                    console.error('Failed to load Firebase configuration');
+                }
+            })
+            .catch(error => {
+                console.error('Error loading Firebase configuration:', error);
+            });
     </script>
     
     {% block extra_js %}{% endblock %}
